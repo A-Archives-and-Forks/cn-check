@@ -37,19 +37,19 @@
 ## 架构
 
 ```
-public/               静态页面（Cloudflare Static Assets 直接托管）
+public/                                 // 静态页面（Cloudflare Static Assets 直接托管）
   index.html
-  app.js              全部检测与打分逻辑（无依赖的原生 JS）
+  app.js                                // 全部检测与打分逻辑（无依赖的原生 JS）
   style.css
-src/index.ts          Worker：仅处理 /api/*
-  GET /api/ip         返回 request.cf 中的 IP、国家、ASN、时区、colo，并附 chnroutes 判定
-  GET /api/ip-china   判断任意 IPv4 是否属于中国大陆（供 WebRTC 泄露比对）
-  GET /api/dns-lookup 服务端代理 VPS 的 dns-probe，回收解析器出口 IP 并 chnroutes 判定
-src/chnroutes.ts      IPv4 是否在中国大陆的二分查找
-src/chnroutes-data.ts 自动生成的 CIDR 区间数据（勿手改）
-scripts/build-chnroutes.mjs  刷新 chnroutes 数据：node scripts/build-chnroutes.mjs
-.github/workflows/update-chnroutes.yml  每日定时重建 chnroutes，有变化才提交（触发自动部署）
-dns-probe/            可选：部署在自有 VPS 上的 DNS 泄露探测服务（见其 README）
+src/index.ts                            // Worker：仅处理 /api/*
+  GET /api/ip                           // 返回 request.cf 中的 IP、国家、ASN、时区、colo，并附 chnroutes 判定
+  GET /api/ip-china                     // 判断任意 IPv4 是否属于中国大陆（供 WebRTC 泄露比对）
+  GET /api/dns-lookup                   // 服务端代理 VPS 的 dns-probe，回收解析器出口 IP 并 chnroutes 判定
+src/chnroutes.ts                        // IPv4 是否在中国大陆的二分查找
+src/chnroutes-data.ts                   // 自动生成的 CIDR 区间数据（勿手改）
+scripts/build-chnroutes.mjs             // 刷新 chnroutes 数据：node scripts/build-chnroutes.mjs
+.github/workflows/update-chnroutes.yml  // 每日定时重建 chnroutes，有变化才提交（触发自动部署）
+dns-probe/                              // 可选：部署在自有 VPS 上的 DNS 泄露探测服务（见其 README）
 ```
 
 `wrangler.jsonc` 中 `run_worker_first: ["/api/*"]`——静态资源不经过 Worker，不产生请求费用。
