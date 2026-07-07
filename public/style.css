@@ -9,6 +9,7 @@
   --partial: #d97706;
   --miss: #16a34a;
   --bar-bg: #e5e7eb;
+  --note-bg: #f1f3f5;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -19,6 +20,7 @@
     --muted: #9aa0a6;
     --border: #2d333b;
     --bar-bg: #2d333b;
+    --note-bg: #232a31;
   }
 }
 
@@ -185,11 +187,12 @@ header h1 {
 #toggle-secret[aria-pressed="true"] .eye-off { display: inline; }
 
 /* ---- 隐藏敏感信息（截图模式） ---- */
-/* IP 卡片、WebRTC / DNS 详情为敏感数据集中区，整块模糊 */
+/* IP 卡片、WebRTC 详情为敏感数据集中区，整块模糊 */
 body.redacted #check-ipCountry .card-summary,
 body.redacted #check-ipCountry .card-detail,
 body.redacted #check-webrtc .card-detail,
-body.redacted #check-dnsLeak .card-detail {
+/* DNS 卡片只有展开后的解析器出口 IP 敏感，说明文字与标题不模糊 */
+body.redacted #check-dnsLeak .resolver-items {
   filter: blur(7px);
   user-select: none;
   pointer-events: none;
@@ -251,6 +254,7 @@ body.redacted .secret {
   font-size: 0.95rem;
 }
 
+/* 检测数据：实测出的原始信息（IP、延迟、解析器出口等） */
 .card-detail {
   margin: 0.5rem 0 0;
   font-size: 0.8rem;
@@ -259,6 +263,22 @@ body.redacted .secret {
   word-break: break-all;
   font-family: inherit;
 }
+
+.card-detail:empty { display: none; }
+
+/* 说明：对该项检测含义的解释，用浅底盒子与检测数据区分 */
+.card-note {
+  margin-top: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 6px;
+  background: var(--note-bg);
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.card-note:empty { display: none; }
 
 .resolver-list {
   margin-bottom: 0.4rem;

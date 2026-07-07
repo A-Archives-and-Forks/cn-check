@@ -105,7 +105,7 @@ function fmtMs(ms) {
 
 /* ============================================================
  * 各项检测，每项返回:
- * { confidence: 0~1, summary: 短结论, detail: 说明, flags?: [代理迹象] }
+ * { confidence: 0~1, summary: 短结论, detail: 实测数据, note?: 解释说明, flags?: [代理迹象] }
  * ============================================================ */
 
 async function checkIp() {
@@ -145,7 +145,7 @@ function checkTimezone(ipInfo) {
     mismatch,
     flags,
     summary: `${tz || "未知"} (UTC${offset >= 0 ? "+" : ""}${offset})`,
-    detail: confidence
+    note: confidence
       ? "浏览器时区指向中国，这是网站识别中国用户最常用的信号之一"
       : "浏览器时区未指向中国",
   };
@@ -162,7 +162,7 @@ function checkLanguage() {
   return {
     confidence,
     summary: langs.slice(0, 3).join(", ") || "未知",
-    detail: confidence >= 1
+    note: confidence >= 1
       ? "首选语言为简体中文"
       : confidence > 0
         ? "语言列表中包含中文"
@@ -177,7 +177,7 @@ function checkTwFlag() {
   canvas.height = size * 1.4;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   if (!ctx) {
-    return { confidence: 0, summary: "无法判断", detail: "Canvas 不可用，无法检测" };
+    return { confidence: 0, summary: "无法判断", note: "Canvas 不可用，无法检测" };
   }
   ctx.font = `${size}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
   ctx.textBaseline = "top";
@@ -212,7 +212,7 @@ function checkTwFlag() {
     return {
       confidence: 0,
       summary: "无法判断",
-      detail: "系统不渲染彩色旗帜 emoji（常见于 Windows），此项无法用于判断",
+      note: "系统不渲染彩色旗帜 emoji（常见于 Windows），此项无法用于判断",
     };
   }
   if (!tw.ligates || !tw.colorful) {
@@ -220,17 +220,17 @@ function checkTwFlag() {
       confidence: 1,
       summary: "🇹🇼 被系统屏蔽",
       flags: ["旗帜 emoji 被屏蔽：设备为大陆行货或地区设为中国大陆，VPN 无法掩盖此特征"],
-      detail:
+      note:
         "🇨🇳 正常渲染为彩色旗帜，🇹🇼 却" +
         (tw.ligates ? "被替换成黑白占位符" : "未合成旗帜") +
-        "。\n大陆销售的 Apple 设备或地区设为中国大陆的系统会屏蔽某个旗帜，" +
+        "。大陆销售的 Apple 设备或地区设为中国大陆的系统会屏蔽某个旗帜，" +
         "这是一个与网络无关的设备级信号",
     };
   }
   return {
     confidence: 0,
     summary: "正常渲染",
-    detail: "🇹🇼 与 🇨🇳 均正常渲染为彩色旗帜，设备未启用大陆地区的 emoji 屏蔽",
+    note: "🇹🇼 与 🇨🇳 均正常渲染为彩色旗帜，设备未启用大陆地区的 emoji 屏蔽",
   };
 }
 
@@ -255,11 +255,11 @@ async function checkBlocked() {
         : failed > 0
           ? `部分不可达 (${failed}/${total})`
           : `全部可达 (${total}/${total})`,
-    detail:
-      lines.join("\n") +
-      (failed > 0 && failed < total
-        ? "\n注意：个别服务不可达也可能是广告拦截插件或服务自身故障所致"
-        : ""),
+    detail: lines.join("\n"),
+    note:
+      failed > 0 && failed < total
+        ? "个别服务不可达也可能是广告拦截插件或服务自身故障所致"
+        : undefined,
   };
 }
 
@@ -278,9 +278,8 @@ async function checkLatency() {
     confidence,
     basis,
     summary: basis === Infinity ? "大陆站点不可达" : `${basis} ms（第二低）`,
-    detail:
-      results.map((r) => `${r.name}: ${fmtMs(r.ms)}`).join("\n") +
-      `\n取第二低值打分（防单站海外 CDN 误判），< ${THRESHOLDS.latencyNear} ms 说明物理位置在大陆或紧邻大陆`,
+    detail: results.map((r) => `${r.name}: ${fmtMs(r.ms)}`).join("\n"),
+    note: `取第二低值打分（防单站海外 CDN 误判），< ${THRESHOLDS.latencyNear} ms 说明物理位置在大陆或紧邻大陆`,
   };
 }
 
@@ -326,9 +325,9 @@ async function checkIntlLatency(latencyPromise, ipInfo) {
     flags,
     summary:
       usMin === Infinity ? "美国站点不可达" : `美国 ${usMin} ms / 亚太 ${fmtMs(asiaMin)}`,
-    detail:
-      results.map((r) => `${r.name}: ${fmtMs(r.ms)}`).join("\n") +
-      "\n参照点为 AWS 区域端点（位置固定、无全球 CDN）。大陆直连美国通常 > 300 ms，" +
+    detail: results.map((r) => `${r.name}: ${fmtMs(r.ms)}`).join("\n"),
+    note:
+      "参照点为 AWS 区域端点（位置固定、无全球 CDN）。大陆直连美国通常 > 300 ms，" +
       "而港/新/日/韩等地直连美国多在 150~250 ms" +
       geoNote,
   };
@@ -375,13 +374,13 @@ function gatherStunIps() {
 async function checkWebRTC(ipInfo) {
   const leaked = await gatherStunIps();
   if (leaked === null) {
-    return { confidence: 0, summary: "不支持", detail: "浏览器不支持 WebRTC 或已被禁用" };
+    return { confidence: 0, summary: "不支持", note: "浏览器不支持 WebRTC 或已被禁用" };
   }
   if (leaked.length === 0) {
     return {
       confidence: 0,
       summary: "无公网候选",
-      detail: "未获取到 STUN 公网地址（UDP 被阻断或浏览器已保护），无法比对",
+      note: "未获取到 STUN 公网地址（UDP 被阻断或浏览器已保护），无法比对",
     };
   }
 
@@ -407,15 +406,16 @@ async function checkWebRTC(ipInfo) {
       summary: "真实 IP 在中国大陆",
       detail:
         `STUN 公网地址: ${leaked.join(", ")}\n` +
-        `其中 ${chinaLeak.ip} 经 chnroutes 判定属于中国大陆。\n` +
-        "即使 HTTP 走了代理，UDP 直连仍暴露了位于中国的真实网络",
+        `其中 ${chinaLeak.ip} 经 chnroutes 判定属于中国大陆`,
+      note: "即使 HTTP 走了代理，UDP 直连仍暴露了位于中国的真实网络",
     };
   }
   if (leaked.includes(httpIp)) {
     return {
       confidence: 0,
       summary: "与 HTTP IP 一致",
-      detail: `STUN 公网地址: ${leaked.join(", ")}\n与 HTTP 出口一致，无代理泄露`,
+      detail: `STUN 公网地址: ${leaked.join(", ")}`,
+      note: "与 HTTP 出口一致，无代理泄露",
     };
   }
   const sameFamily = leaked.filter((ip) => ip.includes(":") === httpIp.includes(":"));
@@ -424,15 +424,15 @@ async function checkWebRTC(ipInfo) {
       confidence: 1, // 仅代理迹象，是否计入中国分在汇总处受其他信号约束
       flags: ["WebRTC 泄露的公网 IP 与 HTTP 出口不一致"],
       summary: "泄露了不同的公网 IP",
-      detail:
-        `STUN 公网地址: ${leaked.join(", ")}\nHTTP 出口: ${httpIp}\n` +
-        "两者不一致，说明 HTTP 流量走了代理，而 UDP 直连暴露了另一网络（但不在中国大陆）",
+      detail: `STUN 公网地址: ${leaked.join(", ")}\nHTTP 出口: ${httpIp}`,
+      note: "两者不一致，说明 HTTP 流量走了代理，而 UDP 直连暴露了另一网络（但不在中国大陆）",
     };
   }
   return {
     confidence: 0,
     summary: "IP 协议族不同",
-    detail: `STUN 地址 (${leaked.join(", ")}) 与 HTTP 出口 (${httpIp}) 协议族不同，无法直接比对`,
+    detail: `STUN 地址: ${leaked.join(", ")}\nHTTP 出口: ${httpIp}`,
+    note: "两者协议族不同，无法直接比对",
   };
 }
 
@@ -449,7 +449,7 @@ async function checkDnsLeak() {
     return {
       confidence: 0,
       summary: "未配置",
-      detail: "未配置 DNS 泄露探测服务（DNS_PROBE_ZONE，见 README），此项跳过",
+      note: "未配置 DNS 泄露探测服务（DNS_PROBE_ZONE，见 README），此项跳过",
     };
   }
   const uuid = (crypto.randomUUID?.() || Date.now().toString(36) + Math.random().toString(36).slice(2)).replace(/[^a-z0-9-]/gi, "");
@@ -464,14 +464,14 @@ async function checkDnsLeak() {
     const res = await fetch(`/api/dns-lookup?id=${uuid}`, { cache: "no-store" });
     data = await res.json();
   } catch (e) {
-    return { confidence: 0, summary: "无法判断", detail: "查询 DNS 探测服务失败：" + e };
+    return { confidence: 0, summary: "无法判断", note: "查询 DNS 探测服务失败：" + e };
   }
 
   if (data.available === false) {
     return {
       confidence: 0,
       summary: "探测服务不可用",
-      detail: "DNS 泄露探测服务（VPS）未部署或不可达，此项跳过",
+      note: "DNS 泄露探测服务（VPS）未部署或不可达，此项跳过",
     };
   }
   const resolvers = data.resolvers || [];
@@ -479,8 +479,7 @@ async function checkDnsLeak() {
     return {
       confidence: 0,
       summary: "未捕获解析器",
-      detail:
-        "未能在时限内观测到你的解析器查询——可能是 DNS 委派未生效、解析被缓存，或浏览器未真正发起解析",
+      note: "未能在时限内观测到你的解析器查询——可能是 DNS 委派未生效、解析被缓存，或浏览器未真正发起解析",
     };
   }
   const chinaOne = resolvers.find((r) => r.china);
@@ -497,15 +496,15 @@ async function checkDnsLeak() {
       chinaDns: true,
       flags: [`DNS 解析器出口 (${secret(chinaOne.ip)}) 在中国大陆`],
       summary: "解析器在中国大陆",
-      detailHtml:
-        listBlock +
-        "<div>DNS 解析走了中国大陆的解析器——分流代理常只代理 HTTP、DNS 仍用国内运营商，这是很强的中国特征</div>",
+      detailHtml: listBlock,
+      note: "DNS 解析走了中国大陆的解析器——分流代理常只代理 HTTP、DNS 仍用国内运营商，这是很强的中国特征",
     };
   }
   return {
     confidence: 0,
     summary: "解析器在境外",
-    detailHtml: listBlock + "<div>均不在中国大陆</div>",
+    detailHtml: listBlock,
+    note: "均不在中国大陆",
   };
 }
 
@@ -540,7 +539,8 @@ function renderCards() {
         <span class="card-score" title="得分 / 权重">– / ${WEIGHTS[def.key]}</span>
       </div>
       <div class="card-summary">检测中…</div>
-      <pre class="card-detail"></pre>`;
+      <pre class="card-detail"></pre>
+      <div class="card-note"></div>`;
     grid.appendChild(card);
   }
 }
@@ -557,6 +557,10 @@ function fillCard(key, result, score) {
   // detailHtml 用于需要富结构的项（如可折叠的解析器列表）；其余仍走纯文本
   if (result.detailHtml != null) detailEl.innerHTML = result.detailHtml;
   else detailEl.textContent = result.detail || "";
+  // note 为解释性说明，与实测数据分区展示；noteHtml 支持富结构
+  const noteEl = card.querySelector(".card-note");
+  if (result.noteHtml != null) noteEl.innerHTML = result.noteHtml;
+  else noteEl.textContent = result.note || "";
 }
 
 function failCard(key, err) {
@@ -647,7 +651,7 @@ async function runAll() {
       confidence: tz.mismatch || 0,
       flags: [],
       summary: tz.mismatch ? "不一致" : "一致",
-      detail: tz.mismatch
+      note: tz.mismatch
         ? "浏览器时区与 IP 归属地不匹配，常见于使用代理/VPN 的场景"
         : "浏览器时区与 IP 归属地相符",
     });
