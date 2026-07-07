@@ -247,6 +247,24 @@ body.redacted .secret {
   font-family: inherit;
 }
 
+.resolver-list {
+  margin-bottom: 0.4rem;
+}
+
+.resolver-list > summary {
+  cursor: pointer;
+  color: var(--text);
+  list-style-position: inside;
+}
+
+.resolver-list > summary:hover { color: var(--accent); }
+
+.resolver-items {
+  margin-top: 0.3rem;
+  padding-left: 0.9rem;
+  line-height: 1.5;
+}
+
 footer {
   margin-top: 2rem;
   font-size: 0.8rem;

@@ -65,6 +65,9 @@ const NEAR_CHINA_TIMEZONES = ["Asia/Hong_Kong", "Asia/Macau"];
  * ============================================================ */
 const $ = (sel) => document.querySelector(sel);
 
+const escapeHtml = (s) =>
+  String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
 // 把敏感值（IP、归属国等）包进可被“隐藏敏感信息”模式模糊的行内标记
 const secret = (v) => `<span class="secret">${v}</span>`;
 
@@ -451,22 +454,28 @@ async function checkDnsLeak() {
     };
   }
   const chinaOne = resolvers.find((r) => r.china);
-  const list = resolvers.map((r) => `${r.ip}${r.china ? "（中国大陆）" : ""}`).join("\n");
+  // 解析器可能很多，默认折叠，点击“观测到的解析器出口”手动展开
+  const listItems = resolvers
+    .map((r) => `${escapeHtml(r.ip)}${r.china ? "（中国大陆）" : ""}`)
+    .join("<br>");
+  const listBlock =
+    `<details class="resolver-list"><summary>观测到的解析器出口（共 ${resolvers.length} 个）</summary>` +
+    `<div class="resolver-items">${listItems}</div></details>`;
   if (chinaOne) {
     return {
       confidence: 1,
       chinaDns: true,
       flags: [`DNS 解析器出口 (${secret(chinaOne.ip)}) 在中国大陆`],
       summary: "解析器在中国大陆",
-      detail:
-        `观测到的解析器出口:\n${list}\n` +
-        "DNS 解析走了中国大陆的解析器——分流代理常只代理 HTTP、DNS 仍用国内运营商，这是很强的中国特征",
+      detailHtml:
+        listBlock +
+        "<div>DNS 解析走了中国大陆的解析器——分流代理常只代理 HTTP、DNS 仍用国内运营商，这是很强的中国特征</div>",
     };
   }
   return {
     confidence: 0,
     summary: "解析器在境外",
-    detail: `观测到的解析器出口:\n${list}\n均不在中国大陆`,
+    detailHtml: listBlock + "<div>均不在中国大陆</div>",
   };
 }
 
@@ -514,7 +523,10 @@ function fillCard(key, result, score) {
   // 部分命中会产生小数（如置信度 0.4 × 权重 23 = 9.2），整数时不显示 .0
   card.querySelector(".card-score").textContent = `${+score.toFixed(1)} / ${WEIGHTS[key]}`;
   card.querySelector(".card-summary").textContent = result.summary;
-  card.querySelector(".card-detail").textContent = result.detail || "";
+  const detailEl = card.querySelector(".card-detail");
+  // detailHtml 用于需要富结构的项（如可折叠的解析器列表）；其余仍走纯文本
+  if (result.detailHtml != null) detailEl.innerHTML = result.detailHtml;
+  else detailEl.textContent = result.detail || "";
 }
 
 function failCard(key, err) {
