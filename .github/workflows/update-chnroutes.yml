@@ -25,11 +25,11 @@ jobs:
       - name: Commit if changed
         run: |
           if git diff --quiet -- src/chnroutes-data.ts; then
-            echo "chnroutes 无变化，跳过提交"
+            echo "No changes in chnroutes, skipping commit"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/chnroutes-data.ts
-          git commit -m "chore: 每日更新 chnroutes 数据"
+          git commit -m "chore: daily update of chnroutes data"
           git push
